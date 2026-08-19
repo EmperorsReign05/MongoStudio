@@ -11,13 +11,17 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import useFlowStore from '@/store/flowStore';
+import DBNode from '@/components/nodes/DBNode';
 import CollectionNode from '@/components/nodes/CollectionNode';
+import MethodNode from '@/components/nodes/MethodNode';
 import MatchNode from '@/components/nodes/MatchNode';
 import SortNode from '@/components/nodes/SortNode';
 import LimitNode from '@/components/nodes/LimitNode';
 
 const nodeTypes = {
+  db: DBNode,
   collection: CollectionNode,
+  method: MethodNode,
   match: MatchNode,
   sort: SortNode,
   limit: LimitNode,
@@ -46,7 +50,9 @@ function Flow() {
       };
       
       let defaultData = {};
+      if (type === 'db') defaultData = {};
       if (type === 'collection') defaultData = { collection: 'students' };
+      if (type === 'method') defaultData = { method: 'find' };
       if (type === 'match') defaultData = { field: '', operator: '$eq', value: '' };
       if (type === 'sort') defaultData = { sortField: '', sortDirection: 1 };
       if (type === 'limit') defaultData = { limit: 10 };
@@ -89,42 +95,64 @@ function Sidebar() {
   };
 
   return (
-    <aside className="w-64 bg-gray-50 border-r border-gray-200 p-4 flex flex-col gap-4">
-      <h2 className="font-bold text-lg text-gray-700 border-b pb-2">Blocks</h2>
+    <aside className="w-64 bg-gray-50 border-r border-gray-200 p-4 flex flex-col gap-4 overflow-y-auto">
+      <h2 className="font-bold text-lg text-gray-700 border-b pb-2">Syntax Blocks</h2>
       
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase">Sources</h3>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase">1. Database Root</h3>
         <div 
-          className="bg-white border border-blue-300 rounded p-2 text-center cursor-grab hover:shadow-md transition-shadow"
-          onDragStart={(event) => onDragStart(event, 'collection')}
+          className="bg-gray-800 text-white rounded p-2 text-center cursor-grab hover:shadow-md transition-shadow font-mono"
+          onDragStart={(event) => onDragStart(event, 'db')}
           draggable
         >
-          Collection
+          db
         </div>
       </div>
 
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase">Filters & Aggregation</h3>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase">2. Collections</h3>
+        <div 
+          className="bg-white border border-blue-300 rounded p-2 text-center cursor-grab hover:shadow-md transition-shadow font-mono text-blue-700"
+          onDragStart={(event) => onDragStart(event, 'collection')}
+          draggable
+        >
+          .collection
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase">3. Methods</h3>
+        <div 
+          className="bg-white border border-red-300 rounded p-2 text-center cursor-grab hover:shadow-md transition-shadow font-mono text-red-700"
+          onDragStart={(event) => onDragStart(event, 'method')}
+          draggable
+        >
+          .method()
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase">4. Stages & Filters</h3>
         <div 
           className="bg-white border border-green-300 rounded p-2 text-center cursor-grab hover:shadow-md transition-shadow"
           onDragStart={(event) => onDragStart(event, 'match')}
           draggable
         >
-          $match
+          $match Filter
         </div>
         <div 
           className="bg-white border border-purple-300 rounded p-2 text-center cursor-grab hover:shadow-md transition-shadow"
           onDragStart={(event) => onDragStart(event, 'sort')}
           draggable
         >
-          $sort
+          $sort Modifier
         </div>
         <div 
           className="bg-white border border-orange-300 rounded p-2 text-center cursor-grab hover:shadow-md transition-shadow"
           onDragStart={(event) => onDragStart(event, 'limit')}
           draggable
         >
-          $limit
+          $limit Modifier
         </div>
       </div>
     </aside>
