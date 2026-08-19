@@ -30,17 +30,20 @@ export type AppNode = Node<AppNodeData>;
 export type FlowState = {
   nodes: AppNode[];
   edges: Edge[];
+  activeSchemaFields: string[];
   onNodesChange: OnNodesChange<AppNode>;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
   setNodes: (nodes: AppNode[]) => void;
   setEdges: (edges: Edge[]) => void;
   updateNodeData: (nodeId: string, data: Partial<AppNodeData>) => void;
+  setActiveSchemaFields: (fields: string[]) => void;
 };
 
 const useFlowStore = create<FlowState>((set, get) => ({
   nodes: [],
   edges: [],
+  activeSchemaFields: [],
   onNodesChange: (changes: NodeChange<AppNode>[]) => {
     set({
       nodes: applyNodeChanges(changes, get().nodes),
@@ -74,6 +77,9 @@ const useFlowStore = create<FlowState>((set, get) => ({
         return node;
       }),
     });
+  },
+  setActiveSchemaFields: (fields: string[]) => {
+    set({ activeSchemaFields: fields });
   },
 }));
 

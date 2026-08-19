@@ -4,6 +4,8 @@ import useFlowStore from '@/store/flowStore';
 export default function MatchNode({ id, data }: { id: string, data: any }) {
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
 
+  const activeSchemaFields = useFlowStore((state) => state.activeSchemaFields);
+
   return (
     <div className="bg-white border-2 border-green-500 rounded-md p-4 min-w-[250px] shadow-sm">
       {/* Input from previous stage */}
@@ -15,11 +17,15 @@ export default function MatchNode({ id, data }: { id: string, data: any }) {
         <div className="flex gap-2">
           <input 
             type="text" 
-            placeholder="Field (e.g. age)" 
+            list={`fields-${id}`}
+            placeholder="Field" 
             className="border rounded p-1 text-sm w-1/2 bg-gray-50"
             value={data.field || ''}
             onChange={(e) => updateNodeData(id, { field: e.target.value })}
           />
+          <datalist id={`fields-${id}`}>
+            {activeSchemaFields.map(f => <option key={f} value={f} />)}
+          </datalist>
           <select 
             className="border rounded p-1 text-sm w-1/4 bg-gray-50"
             value={data.operator || '$eq'}

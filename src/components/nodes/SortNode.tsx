@@ -4,6 +4,8 @@ import useFlowStore from '@/store/flowStore';
 export default function SortNode({ id, data }: { id: string, data: any }) {
   const updateNodeData = useFlowStore((state) => state.updateNodeData);
 
+  const activeSchemaFields = useFlowStore((state) => state.activeSchemaFields);
+
   return (
     <div className="bg-white border-2 border-purple-500 rounded-md p-4 min-w-[200px] shadow-sm">
       <Handle type="target" position={Position.Top} className="w-3 h-3 bg-gray-400" />
@@ -13,11 +15,15 @@ export default function SortNode({ id, data }: { id: string, data: any }) {
       <div className="flex gap-2">
         <input 
           type="text" 
+          list={`sort-fields-${id}`}
           placeholder="Field" 
           className="border rounded p-1 text-sm w-2/3 bg-gray-50"
           value={data.sortField || ''}
           onChange={(e) => updateNodeData(id, { sortField: e.target.value })}
         />
+        <datalist id={`sort-fields-${id}`}>
+          {activeSchemaFields.map(f => <option key={f} value={f} />)}
+        </datalist>
         <select 
           className="border rounded p-1 text-sm w-1/3 bg-gray-50"
           value={data.sortDirection || 1}
