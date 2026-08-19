@@ -2,25 +2,40 @@ import { Edge, Node } from '@xyflow/react';
 import { QueryAST, PipelineStageAST, FilterAST, Condition } from '@/types/ast';
 
 export function parseGraphToAST(nodes: Node[], edges: Edge[]): QueryAST | null {
-  // 1. Find the collection node (the source)
-  const collectionNode = nodes.find(n => n.type === 'collection');
+  // 1. Find the DB node (the absolute root)
+  const dbNode = nodes.find(n => n.type === 'db');
   
-  if (!collectionNode) {
-    return null; // A query must start with a collection
+  if (!dbNode) {
+    return null; // A query must start with db
   }
 
+  // 2. Find the connected Collection node
+  const dbEdge = edges.find(e => e.source === dbNode.id);
+  if (!dbEdge) return null;
+
+  const collectionNode = nodes.find(n => n.id === dbEdge.target);
+  if (!collectionNode || collectionNode.type !== 'collection') return null;
+
+  // 3. Find the connected Method node
+  const colEdge = edges.find(e => e.source === collectionNode.id);
+  if (!colEdge) return null;
+
+  const methodNode = nodes.find(n => n.id === colEdge.target);
+  if (!methodNode || methodNode.type !== 'method') return null;
+
+  const operation = methodNode.data.method as 'find' | 'aggregate';
+
   const ast: QueryAST = {
-    operation: 'aggregate', // Default to aggregate for simplicity of pipelines
+    operation,
     collection: collectionNode.data.collection as string,
-    pipeline: []
   };
 
-  // 2. Traverse the graph starting from the collection node
-  let currentNodeId = collectionNode.id;
+  // 4. Parse the arguments/pipeline stages attached to the method
+  const stages: PipelineStageAST[] = [];
+  let currentNodeId = methodNode.id;
   let hasMoreNodes = true;
 
   while (hasMoreNodes) {
-    // Find the edge that goes OUT of the current node
     const outgoingEdge = edges.find(e => e.source === currentNodeId);
     
     if (!outgoingEdge) {
@@ -28,7 +43,6 @@ export function parseGraphToAST(nodes: Node[], edges: Edge[]): QueryAST | null {
       break;
     }
 
-    // Find the next node
     const nextNode = nodes.find(n => n.id === outgoingEdge.target);
     
     if (!nextNode) {
@@ -36,14 +50,27 @@ export function parseGraphToAST(nodes: Node[], edges: Edge[]): QueryAST | null {
       break;
     }
 
-    // Convert the next node to a pipeline stage
     const stage = parseNodeToStage(nextNode);
     if (stage) {
-      ast.pipeline!.push(stage);
+      stages.push(stage);
     }
 
-    // Move to the next node
     currentNodeId = nextNode.id;
+  }
+
+  if (operation === 'aggregate') {
+    ast.pipeline = stages;
+  } else if (operation === 'find') {
+    // For find(), we treat the first $match stage as the filter, 
+    // and subsequent $sort/$limit as cursor modifiers.
+    // This isn't perfect Mongoose translation, but the AST captures it well.
+    // The code generator in Phase 3 will handle turning this AST into `find(filter).sort(..)`
+    const matchStage = stages.find(s => s.stage === '$match') as { stage: '$match', filter: FilterAST } | undefined;
+    if (matchStage) {
+      ast.filter = matchStage.filter;
+    }
+    // We pass the rest of the stages in pipeline anyway, so the code generator can extract sort/limit modifiers
+    ast.pipeline = stages.filter(s => s.stage !== '$match');
   }
 
   return ast;
@@ -53,7 +80,7 @@ function parseNodeToStage(node: Node): PipelineStageAST | null {
   switch (node.type) {
     case 'match': {
       const data = node.data;
-      if (!data.field) return null; // Skip empty match
+      if (!data.field) return null; 
       
       const condition: Condition = {
         type: 'condition',
@@ -88,19 +115,15 @@ function parseNodeToStage(node: Node): PipelineStageAST | null {
   }
 }
 
-// Helper to convert string values to correct types
 function parseValue(value: string): any {
   if (value === undefined || value === null) return '';
   
-  // Try parsing as number
   if (!isNaN(Number(value)) && value.trim() !== '') {
     return Number(value);
   }
   
-  // Try parsing boolean
   if (value.toLowerCase() === 'true') return true;
   if (value.toLowerCase() === 'false') return false;
 
-  // Otherwise it's a string
   return value;
 }
