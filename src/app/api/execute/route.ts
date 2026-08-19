@@ -27,13 +27,17 @@ export async function POST(request: Request) {
     let results = [];
 
     // Parse filters from AST back to Mongoose syntax
-    const parseFilter = (filterAST: any) => {
+    const parseFilter = (filterAST: any): any => {
       if (!filterAST) return {};
       if (filterAST.type === 'condition') {
         if (filterAST.operator === '$eq') {
           return { [filterAST.field]: filterAST.value };
         }
         return { [filterAST.field]: { [filterAST.operator]: filterAST.value } };
+      }
+      if (filterAST.type === 'logical') {
+        const children = filterAST.children.map((child: any) => parseFilter(child));
+        return { [filterAST.operator]: children };
       }
       return {};
     };

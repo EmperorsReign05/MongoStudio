@@ -48,7 +48,12 @@ function generateFilterCode(filter?: FilterAST): string {
     }
   }
 
-  // To support $and / $or later
+  if (filter.type === 'logical') {
+    const logic = filter;
+    const childrenCode = logic.children.map(child => generateFilterCode(child)).join(', ');
+    return `{ "${logic.operator}": [ ${childrenCode} ] }`;
+  }
+
   return '{}'; 
 }
 
