@@ -18,6 +18,10 @@ import MatchNode from '@/components/nodes/MatchNode';
 import SortNode from '@/components/nodes/SortNode';
 import LimitNode from '@/components/nodes/LimitNode';
 
+import { parseGraphToAST } from '@/lib/parser';
+import { generateMongoCode } from '@/lib/codeGenerator';
+import { useState } from 'react';
+
 const nodeTypes = {
   db: DBNode,
   collection: CollectionNode,
@@ -26,6 +30,77 @@ const nodeTypes = {
   sort: SortNode,
   limit: LimitNode,
 };
+
+function RightPanel() {
+  const { nodes, edges } = useFlowStore();
+  const [results, setResults] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const ast = useMemo(() => parseGraphToAST(nodes, edges), [nodes, edges]);
+  const code = useMemo(() => generateMongoCode(ast), [ast]);
+
+  const runQuery = async () => {
+    if (!ast) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ast)
+      });
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+        setResults(null);
+      } else {
+        setResults(data.data);
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <aside className="w-96 bg-gray-50 border-l border-gray-200 flex flex-col h-full overflow-hidden text-sm">
+      <div className="flex-1 border-b flex flex-col overflow-hidden">
+        <div className="p-3 bg-gray-100 border-b font-semibold text-gray-700 flex justify-between items-center">
+          Generated Code
+          <button 
+            onClick={runQuery}
+            disabled={!ast || loading}
+            className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50"
+          >
+            {loading ? 'Running...' : 'Run Query'}
+          </button>
+        </div>
+        <div className="p-4 flex-1 overflow-auto bg-gray-900 text-green-400 font-mono text-xs whitespace-pre-wrap">
+          {code}
+        </div>
+      </div>
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="p-3 bg-gray-100 border-b font-semibold text-gray-700">
+          Results
+        </div>
+        <div className="p-4 flex-1 overflow-auto bg-white">
+          {error && <div className="text-red-500 mb-2 font-mono">{error}</div>}
+          {!error && results && (
+            <pre className="font-mono text-xs text-gray-800">
+              {JSON.stringify(results, null, 2)}
+            </pre>
+          )}
+          {!error && !results && !loading && (
+            <div className="text-gray-400 text-center mt-10">Run a query to see results</div>
+          )}
+        </div>
+      </div>
+    </aside>
+  );
+}
 
 function Flow() {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, setNodes } = useFlowStore();
@@ -163,9 +238,10 @@ export default function MongoBlocksApp() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-white text-black">
       <Sidebar />
-      <main className="flex-1 h-full">
+      <main className="flex-1 h-full flex">
         <ReactFlowProvider>
           <Flow />
+          <RightPanel />
         </ReactFlowProvider>
       </main>
     </div>
