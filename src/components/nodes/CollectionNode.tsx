@@ -6,7 +6,8 @@ export default function CollectionNode({ id, data }: { id: string, data: any }) 
 
   return (
     <div className="bg-white border-2 border-blue-500 rounded-md p-4 min-w-[200px] shadow-sm">
-      <div className="font-bold text-blue-700 mb-2 border-b pb-1">Collection</div>
+      <Handle type="target" position={Position.Top} className="w-3 h-3 bg-gray-400" />
+      <div className="font-bold text-blue-700 mb-2 border-b pb-1">.collection</div>
       <div className="flex flex-col gap-2">
         <label className="text-xs text-gray-500 font-semibold">Select Dataset</label>
         <select 
