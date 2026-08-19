@@ -14,6 +14,7 @@ import useFlowStore from '@/store/flowStore';
 import DBNode from '@/components/nodes/DBNode';
 import CollectionNode from '@/components/nodes/CollectionNode';
 import MethodNode from '@/components/nodes/MethodNode';
+import LogicNode from '@/components/nodes/LogicNode';
 import MatchNode from '@/components/nodes/MatchNode';
 import SortNode from '@/components/nodes/SortNode';
 import LimitNode from '@/components/nodes/LimitNode';
@@ -26,6 +27,7 @@ const nodeTypes = {
   db: DBNode,
   collection: CollectionNode,
   method: MethodNode,
+  logic: LogicNode,
   match: MatchNode,
   sort: SortNode,
   limit: LimitNode,
@@ -128,6 +130,7 @@ function Flow() {
       if (type === 'db') defaultData = {};
       if (type === 'collection') defaultData = { collection: 'students' };
       if (type === 'method') defaultData = { method: 'find' };
+      if (type === 'logic') defaultData = { operator: '$or' };
       if (type === 'match') defaultData = { field: '', operator: '$eq', value: '' };
       if (type === 'sort') defaultData = { sortField: '', sortDirection: 1 };
       if (type === 'limit') defaultData = { limit: 10 };
@@ -207,7 +210,14 @@ function Sidebar() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold text-gray-500 uppercase">4. Stages & Filters</h3>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase">4. Stages & Logic</h3>
+        <div 
+          className="bg-white border border-indigo-300 rounded p-2 text-center cursor-grab hover:shadow-md transition-shadow font-mono text-indigo-700"
+          onDragStart={(event) => onDragStart(event, 'logic')}
+          draggable
+        >
+          $or / $and Branch
+        </div>
         <div 
           className="bg-white border border-green-300 rounded p-2 text-center cursor-grab hover:shadow-md transition-shadow"
           onDragStart={(event) => onDragStart(event, 'match')}
