@@ -2,120 +2,80 @@ import mongoose from 'mongoose';
 import * as dotenv from 'dotenv';
 import path from 'path';
 
-// Load environment variables
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/mongoblocks';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mongoblocks';
+const students = [
+  ['Aarav Mehta', 21, 'Computer Science', 8.6, 'Jaipur'],
+  ['Diya Sharma', 20, 'Physics', 8.2, 'Delhi'],
+  ['Kabir Khan', 22, 'Mathematics', 7.8, 'Mumbai'],
+  ['Mira Shah', 21, 'Computer Science', 9.1, 'Delhi'],
+  ['Rohan Iyer', 19, 'Economics', 7.4, 'Bengaluru'],
+  ['Ananya Das', 20, 'Computer Science', 8.9, 'Kolkata'],
+].map(([name, age, major, gpa, city], index) => ({
+  name, age, major, gpa,
+  contact: { email: String(name).toLowerCase().replace(' ', '.') + '@example.edu', phone: '555-01' + index, city },
+  courses: [{ code: 'DB201', score: 78 + index * 2 }, { code: 'CS301', score: 82 + index }],
+  skills: index % 2 ? ['MongoDB', 'Python'] : ['MongoDB', 'TypeScript'],
+}));
 
-const StudentSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  age: { type: Number, required: true },
-  major: { type: String, required: true },
-  gpa: { type: Number, required: true },
-  contact: {
-    email: { type: String, required: true },
-    phone: { type: String, required: true },
-  },
-  courses: [{ type: String }],
-});
+const products = [
+  ['Atlas Backpack', 'Travel', 1499, 32, 4.5],
+  ['Nimbus Bottle', 'Lifestyle', 799, 58, 4.2],
+  ['Orbit Headphones', 'Electronics', 3499, 18, 4.7],
+  ['Pixel Notebook', 'Stationery', 249, 120, 4.1],
+  ['Terra Lamp', 'Home', 2199, 15, 4.4],
+  ['Vector Mouse', 'Electronics', 1299, 44, 4.6],
+].map(([name, category, price, stock, rating], index) => ({
+  _id: new mongoose.Types.ObjectId(),
+  sku: 'PRD-' + String(index + 1).padStart(3, '0'),
+  name, category, price, stock, rating,
+  tags: [String(category).toLowerCase(), index % 2 ? 'popular' : 'new'],
+}));
 
-const MovieSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  year: { type: Number, required: true },
-  director: { type: String, required: true },
-  genres: [{ type: String }],
-  imdb: {
-    rating: { type: Number },
-    votes: { type: Number },
-  },
-});
-
-const Student = mongoose.models.Student || mongoose.model('Student', StudentSchema);
-const Movie = mongoose.models.Movie || mongoose.model('Movie', MovieSchema);
-
-const studentsData = [
-  {
-    name: 'Alice Johnson',
-    age: 20,
-    major: 'Computer Science',
-    gpa: 3.8,
-    contact: { email: 'alice@example.com', phone: '555-0100' },
-    courses: ['Database Systems', 'Algorithms', 'Web Development'],
-  },
-  {
-    name: 'Bob Smith',
-    age: 22,
-    major: 'Mathematics',
-    gpa: 3.5,
-    contact: { email: 'bob@example.com', phone: '555-0101' },
-    courses: ['Calculus', 'Linear Algebra'],
-  },
-  {
-    name: 'Charlie Davis',
-    age: 21,
-    major: 'Computer Science',
-    gpa: 3.9,
-    contact: { email: 'charlie@example.com', phone: '555-0102' },
-    courses: ['Operating Systems', 'Algorithms'],
-  },
-  {
-    name: 'Diana Prince',
-    age: 19,
-    major: 'Physics',
-    gpa: 3.6,
-    contact: { email: 'diana@example.com', phone: '555-0103' },
-    courses: ['Quantum Mechanics', 'Thermodynamics'],
-  }
+const sandbox = [
+  { title: 'Draft onboarding lesson', status: 'todo', score: 4, tags: ['learning'], details: { note: 'safe to change', owner: 'team' } },
+  { title: 'Test aggregation card', status: 'review', score: 7, tags: ['ui', 'query'], details: { note: 'safe to delete', owner: 'team' } },
 ];
 
-const moviesData = [
-  {
-    title: 'The Matrix',
-    year: 1999,
-    director: 'Lana Wachowski, Lilly Wachowski',
-    genres: ['Action', 'Sci-Fi'],
-    imdb: { rating: 8.7, votes: 1700000 },
-  },
-  {
-    title: 'Inception',
-    year: 2010,
-    director: 'Christopher Nolan',
-    genres: ['Action', 'Adventure', 'Sci-Fi'],
-    imdb: { rating: 8.8, votes: 2100000 },
-  },
-  {
-    title: 'Interstellar',
-    year: 2014,
-    director: 'Christopher Nolan',
-    genres: ['Adventure', 'Drama', 'Sci-Fi'],
-    imdb: { rating: 8.6, votes: 1500000 },
-  }
-];
+async function seed(): Promise<void> {
+  await mongoose.connect(mongoUri);
+  const database = mongoose.connection.db!;
+  const orders = Array.from({ length: 18 }, (_, index) => {
+    const first = products[index % products.length];
+    const second = products[(index + 2) % products.length];
+    return {
+      orderNo: 'ORD-' + String(1001 + index),
+      customer: { name: ['Mira Shah', 'Aarav Mehta', 'Diya Sharma'][index % 3], city: ['Delhi', 'Jaipur', 'Mumbai'][index % 3] },
+      items: [
+        { productId: first._id, quantity: (index % 3) + 1, unitPrice: first.price },
+        { productId: second._id, quantity: 1, unitPrice: second.price },
+      ],
+      status: index % 4 === 0 ? 'processing' : index % 4 === 1 ? 'shipped' : 'delivered',
+      orderedAt: new Date(Date.UTC(2026, index % 6, (index % 25) + 1)),
+    };
+  });
 
-async function seed() {
-  console.log(`Connecting to ${MONGODB_URI}`);
-  try {
-    await mongoose.connect(MONGODB_URI);
-    console.log('Connected to Database successfully.');
+  for (const name of ['students', 'products', 'orders', 'sandbox']) await database.collection(name).deleteMany({});
+  await database.collection('students').insertMany(students);
+  await database.collection('products').insertMany(products);
+  await database.collection('orders').insertMany(orders);
+  await database.collection('sandbox').insertMany(sandbox);
 
-    await Student.deleteMany({});
-    console.log('Cleared students collection');
-    
-    await Movie.deleteMany({});
-    console.log('Cleared movies collection');
+  await Promise.all([
+    database.collection('students').createIndex({ major: 1, gpa: -1 }),
+    database.collection('students').createIndex({ 'contact.city': 1 }),
+    database.collection('products').createIndex({ category: 1, price: 1 }),
+    database.collection('orders').createIndex({ status: 1, orderedAt: -1 }),
+    database.collection('orders').createIndex({ 'items.productId': 1 }),
+  ]);
 
-    await Student.insertMany(studentsData);
-    console.log('Inserted students data');
-
-    await Movie.insertMany(moviesData);
-    console.log('Inserted movies data');
-
-    console.log('Seeding completed successfully!');
-    process.exit(0);
-  } catch (err) {
-    console.error('Error seeding database:', err);
-    process.exit(1);
-  }
+  console.log('MongoBlocks demo data reset: students, products, orders, sandbox.');
+  await mongoose.disconnect();
 }
 
-seed();
+seed().catch(async (error: unknown) => {
+  console.error('MongoBlocks seed failed:', error);
+  await mongoose.disconnect();
+  process.exitCode = 1;
+});
