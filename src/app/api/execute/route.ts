@@ -1,91 +1,64 @@
 import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
-import Student from '@/models/Student';
-import Movie from '@/models/Movie';
-import { QueryAST } from '@/types/ast';
+import { type QueryAST } from '@/types/ast';
+import { compileFilter, compilePipeline, mongoValueToJS, validateQueryAST } from '@/lib/validator';
+
+export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
-    const ast: QueryAST = await request.json();
-    
-    if (!ast || !ast.collection || !ast.operation) {
-      return NextResponse.json({ error: 'Invalid AST provided' }, { status: 400 });
-    }
+    const ast: unknown = await request.json();
+    const issues = validateQueryAST(ast);
+    if (issues.length) return NextResponse.json({ error: issues[0].message, issues }, { status: 400 });
 
-    await connectToDatabase();
+    const query = ast as QueryAST;
+    const connection = await connectToDatabase();
+    const collection = connection.connection.db!.collection(query.collection);
+    const startedAt = performance.now();
+    let data: unknown;
+    let affectedCount: number | undefined;
 
-    // Determine which model to use
-    let Model;
-    if (ast.collection === 'students') {
-      Model = Student;
-    } else if (ast.collection === 'movies') {
-      Model = Movie;
+    if (query.operation === 'find') {
+      const projection = query.projection?.length ? Object.fromEntries(query.projection.map((item) => [item.field, item.include])) : undefined;
+      let cursor = collection.find(compileFilter(query.filter), { projection });
+      if (query.sort?.length) cursor = cursor.sort(Object.fromEntries(query.sort.map((item) => [item.field, item.direction])));
+      if (query.skip) cursor = cursor.skip(query.skip);
+      cursor = cursor.limit(query.limit ?? 100);
+      data = await cursor.toArray();
+    } else if (query.operation === 'aggregate') {
+      data = await collection.aggregate(compilePipeline(query.pipeline)).toArray();
+    } else if (query.operation === 'insertOne') {
+      const result = await collection.insertOne(Object.fromEntries(Object.entries(query.document ?? {}).map(([key, value]) => [key, mongoValueToJS(value)])));
+      affectedCount = result.acknowledged ? 1 : 0;
+      data = [{ insertedId: result.insertedId }];
+    } else if (query.operation === 'updateMany') {
+      const update = (query.updates ?? []).reduce<Record<string, Record<string, unknown>>>((result, item) => {
+        result[item.operator] ??= {};
+        result[item.operator][item.field] = mongoValueToJS(item.value);
+        return result;
+      }, {});
+      const result = await collection.updateMany(compileFilter(query.filter), update);
+      affectedCount = result.modifiedCount;
+      data = [{ matchedCount: result.matchedCount, modifiedCount: result.modifiedCount }];
     } else {
-      return NextResponse.json({ error: 'Invalid collection' }, { status: 400 });
+      const result = await collection.deleteMany(compileFilter(query.filter));
+      affectedCount = result.deletedCount;
+      data = [{ deletedCount: result.deletedCount }];
     }
 
-    let results = [];
-
-    // Parse filters from AST back to Mongoose syntax
-    const parseFilter = (filterAST: any): any => {
-      if (!filterAST) return {};
-      if (filterAST.type === 'condition') {
-        if (filterAST.operator === '$eq') {
-          return { [filterAST.field]: filterAST.value };
-        }
-        return { [filterAST.field]: { [filterAST.operator]: filterAST.value } };
-      }
-      if (filterAST.type === 'logical') {
-        const children = filterAST.children.map((child: any) => parseFilter(child));
-        return { [filterAST.operator]: children };
-      }
-      return {};
-    };
-
-    // Execute based on operation
-    if (ast.operation === 'find') {
-      const filter = parseFilter(ast.filter);
-      let query = Model.find(filter);
-
-      if (ast.pipeline) {
-        ast.pipeline.forEach((stage: any) => {
-          if (stage.stage === '$sort') {
-            const sortObj: any = {};
-            stage.sorts.forEach((s: any) => { sortObj[s.field] = s.direction; });
-            query = query.sort(sortObj);
-          }
-          if (stage.stage === '$limit') {
-            query = query.limit(stage.limit);
-          }
-        });
-      }
-      
-      results = await query.lean().exec();
-
-    } else if (ast.operation === 'aggregate') {
-      const pipeline: any[] = [];
-      if (ast.pipeline) {
-        ast.pipeline.forEach((stage: any) => {
-          if (stage.stage === '$match') {
-            pipeline.push({ $match: parseFilter(stage.filter) });
-          }
-          if (stage.stage === '$sort') {
-            const sortObj: any = {};
-            stage.sorts.forEach((s: any) => { sortObj[s.field] = s.direction; });
-            pipeline.push({ $sort: sortObj });
-          }
-          if (stage.stage === '$limit') {
-            pipeline.push({ $limit: stage.limit });
-          }
-        });
-      }
-
-      results = await Model.aggregate(pipeline).exec();
-    }
-
-    return NextResponse.json({ success: true, data: results });
-  } catch (error: any) {
-    console.error('Execution Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({
+      success: true,
+      data,
+      meta: {
+        collection: query.collection,
+        operation: query.operation,
+        count: Array.isArray(data) ? data.length : 0,
+        affectedCount,
+        durationMs: Math.round((performance.now() - startedAt) * 10) / 10,
+      },
+    });
+  } catch (error) {
+    console.error('MongoBlocks execution error:', error);
+    return NextResponse.json({ error: 'MongoBlocks could not execute this query. Check your inputs and database connection.' }, { status: 500 });
   }
 }
