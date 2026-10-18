@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Blockly from 'blockly/core';
 import 'blockly/blocks';
+import * as En from 'blockly/msg/en';
 import { BookOpen, Database, Lightbulb, Play, Plus, RotateCcw, Save, Search, Sparkles } from 'lucide-react';
 import { defineBlocks } from '@/lib/blocks';
 import { parseWorkspaceToAST } from '@/lib/blocklyParser';
@@ -93,7 +94,9 @@ export default function MongoBlocksApp() {
   useEffect(() => {
     const host = workspaceHostRef.current;
     if (!host) return;
-
+    Blockly.setLocale(
+      En as unknown as Record<string, string>
+    );
     defineBlocks();
     const injectedWorkspace = Blockly.inject(host, {
       renderer: 'zelos',
