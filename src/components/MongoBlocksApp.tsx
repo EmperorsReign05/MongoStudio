@@ -1,8 +1,7 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Blockly from 'blockly/core';
-import { BlocklyWorkspace } from 'react-blockly';
 import 'blockly/blocks';
 import { BookOpen, Database, Lightbulb, Play, Plus, RotateCcw, Save, Search, Sparkles } from 'lucide-react';
 import { defineBlocks } from '@/lib/blocks';
@@ -10,8 +9,6 @@ import { parseWorkspaceToAST } from '@/lib/blocklyParser';
 import { generateMongoCode } from '@/lib/codeGenerator';
 import { validateQueryAST, type ValidationIssue } from '@/lib/validator';
 import type { QueryAST } from '@/types/ast';
-
-if (typeof window !== 'undefined') defineBlocks();
 
 const blockLibrary = [
   { name: 'Start', colour: 'bg-indigo-500', blocks: [{ type: 'db_root', label: 'Database root', description: 'Start a query' }, { type: 'collection', label: 'Collection', description: 'Choose data' }] },
@@ -69,6 +66,7 @@ function connectToCompatibleContainer(workspace: Blockly.WorkspaceSvg, block: Bl
 }
 
 export default function MongoBlocksApp() {
+  const workspaceHostRef = useRef<HTMLDivElement | null>(null);
   const [workspace, setWorkspace] = useState<Blockly.WorkspaceSvg | null>(null);
   const [ast, setAst] = useState<QueryAST | null>(null);
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
@@ -91,6 +89,33 @@ export default function MongoBlocksApp() {
     setAst((previous) => JSON.stringify(previous) === JSON.stringify(nextAst) ? previous : nextAst);
     setIssues(nextAst ? validateQueryAST(nextAst) : [{ path: 'root', message: 'Connect db, a collection, and an operation to begin.' }]);
   }, []);
+
+  useEffect(() => {
+    const host = workspaceHostRef.current;
+    if (!host) return;
+
+    defineBlocks();
+    const injectedWorkspace = Blockly.inject(host, {
+      renderer: 'zelos',
+      grid: { spacing: 22, length: 3, colour: '#cbd5e1', snap: true },
+      zoom: { controls: true, wheel: true, startScale: 0.9, maxScale: 1.3, minScale: 0.6 },
+      toolbox: { kind: 'flyoutToolbox', contents: [] },
+    });
+    const root = injectedWorkspace.newBlock('db_root');
+    root.initSvg();
+    root.render();
+    root.moveBy(56, 64);
+    const handleChange = () => onWorkspaceChange(injectedWorkspace);
+    injectedWorkspace.addChangeListener(handleChange);
+    setWorkspace(injectedWorkspace);
+    handleChange();
+
+    return () => {
+      injectedWorkspace.removeChangeListener(handleChange);
+      injectedWorkspace.dispose();
+      setWorkspace(null);
+    };
+  }, [onWorkspaceChange]);
 
   const resetWorkspace = () => {
     if (!workspace) return;
@@ -186,7 +211,7 @@ export default function MongoBlocksApp() {
 
         <section className="mongoblocks-workspace relative min-h-0 border-r border-slate-200 bg-white">
           <div className="absolute left-5 top-4 z-10 rounded-lg border border-slate-200 bg-white/95 px-3 py-2 text-xs text-slate-600 shadow-sm"><Sparkles className="mr-1 inline text-amber-500" size={14} /> Build from top to bottom. C-shaped blocks hold nested logic and stages.</div>
-          <BlocklyWorkspace toolboxConfiguration={{ kind: 'flyoutToolbox', contents: [] }} initialXml={'<xml xmlns="https://developers.google.com/blockly/xml"><block type="db_root" x="56" y="64"></block></xml>'} className="h-full w-full" workspaceConfiguration={{ renderer: 'zelos', grid: { spacing: 22, length: 3, colour: '#cbd5e1', snap: true }, zoom: { controls: true, wheel: true, startScale: 0.9, maxScale: 1.3, minScale: 0.6 } }} onWorkspaceChange={onWorkspaceChange} onInject={setWorkspace} />
+          <div ref={workspaceHostRef} className="h-full w-full" />
         </section>
 
         <aside className="flex min-h-0 flex-col bg-white">
